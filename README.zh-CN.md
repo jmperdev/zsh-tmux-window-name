@@ -48,11 +48,10 @@ source ~/.zshrc
 
 ## tmux 配置
 
-这个插件依赖 tmux 的 window rename 和 pane focus hook。请在 `.tmux.conf` 中加入：
+这个插件依赖 tmux 的 window rename 和 tmux hook。请在 `.tmux.conf` 中加入：
 
 ```tmux
 set -g automatic-rename off
-set -g focus-events on
 ```
 
 然后重新加载 tmux 配置：
@@ -61,14 +60,13 @@ set -g focus-events on
 tmux source-file ~/.tmux.conf
 ```
 
-如果你是第一次开启 `focus-events`，建议 detach 再重新 attach 一次 tmux client，确保 pane focus hook 能正常触发。
-
 ## 行为说明
 
 - 只在 tmux 内生效
 - 从 zsh 命令行里提取“第一个真正执行的命令词”
 - 会跳过前置环境变量赋值，例如 `FOO=1`
 - 支持处理 `sudo` 和 `env` 前缀
+- 会忽略 `exit` 和 `logout`，所以关闭 pane 时不会先把标题改成 `exit`
 - 命令结束后恢复执行前的 tmux window 标题
 - 多 pane window 中，可见标题由当前 active pane 决定
 - 如果当前 active pane 是空闲的，即使别的 pane 还在跑命令，也会显示原标题

@@ -82,7 +82,7 @@ __zsh_tmux_window_name_refresh() {
   "$__zsh_tmux_window_name_refresh_script" "$window_id" >/dev/null 2>&1
 }
 
-__zsh_tmux_window_name_install_pane_hooks() {
+__zsh_tmux_window_name_install_tmux_hooks() {
   emulate -L zsh
 
   local hook_shell
@@ -93,8 +93,23 @@ __zsh_tmux_window_name_install_pane_hooks() {
   quoted_window="$(__zsh_tmux_window_name_shell_quote '#{hook_window}')"
   hook_shell="${quoted_script} ${quoted_window}"
 
-  tmux set-hook -p -t "$TMUX_PANE" pane-focus-in "run-shell \"${hook_shell}\"" >/dev/null 2>&1
-  tmux set-hook -p -t "$TMUX_PANE" pane-exited "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-select-pane[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-select-window[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "pane-exited[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-kill-pane[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+}
+
+__zsh_tmux_window_name_is_ignored_command() {
+  emulate -L zsh
+
+  local word="$1"
+  case "$word" in
+    exit|logout)
+      return 0
+      ;;
+  esac
+
+  return 1
 }
 
 __zsh_tmux_window_name_is_assignment() {
@@ -223,6 +238,7 @@ __zsh_tmux_window_name_preexec() {
 
   next_name="$(__zsh_tmux_window_name_parse "$line")" || return 0
   [[ -n $next_name ]] || return 0
+  __zsh_tmux_window_name_is_ignored_command "$next_name" && return 0
 
   window_id="$(__zsh_tmux_window_name_window_id)" || return 0
   [[ -n $window_id ]] || return 0
@@ -255,7 +271,7 @@ __zsh_tmux_window_name_precmd() {
 }
 
 if __zsh_tmux_window_name_should_run; then
-  __zsh_tmux_window_name_install_pane_hooks
+  __zsh_tmux_window_name_install_tmux_hooks
 fi
 
 autoload -Uz add-zsh-hook

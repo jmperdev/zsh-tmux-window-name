@@ -50,11 +50,10 @@ source ~/.zshrc
 
 ## tmux Config
 
-This plugin relies on tmux window renames plus pane focus hooks. Add this to `.tmux.conf`:
+This plugin relies on tmux window renames and tmux hooks. Add this to `.tmux.conf`:
 
 ```tmux
 set -g automatic-rename off
-set -g focus-events on
 ```
 
 Reload tmux config:
@@ -63,14 +62,13 @@ Reload tmux config:
 tmux source-file ~/.tmux.conf
 ```
 
-If you just enabled `focus-events`, detach and reattach the tmux client once so pane focus hooks start firing reliably.
-
 ## Behavior
 
 - Only runs inside tmux
 - Uses the first real command word from the zsh command line
 - Skips leading environment assignments such as `FOO=1`
 - Handles `sudo` and `env` prefixes
+- Ignores `exit` and `logout`, so closing a pane does not temporarily rename the window to `exit`
 - Restores the exact previous tmux window name on the next prompt
 - In multi-pane windows, the active pane controls the visible window title
 - If the active pane is idle, the original window title is shown even when another pane is still running a command
