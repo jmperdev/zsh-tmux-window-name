@@ -1,0 +1,58 @@
+#!/usr/bin/env zsh
+
+emulate -L zsh
+
+window_id="$1"
+
+[[ -n $window_id ]] || exit 0
+(( ${+commands[tmux]} )) || exit 0
+
+window_original_option='@zsh_tmux_window_name_original'
+pane_running_option='@zsh_tmux_window_name_running'
+pane_command_option='@zsh_tmux_window_name_command'
+
+show_option() {
+  local scope_flag="$1"
+  local target="$2"
+  local option_name="$3"
+
+  tmux show-options "-${scope_flag}qv" -t "$target" "$option_name" 2>/dev/null
+}
+
+current_window_name="$(tmux display-message -p -t "$window_id" '#W' 2>/dev/null)" || exit 0
+original_window_name="$(show_option w "$window_id" "$window_original_option")"
+
+active_pane_id=''
+active_pane_running=''
+active_pane_command=''
+any_running=0
+
+while IFS=$'\t' read -r pane_id pane_active; do
+  [[ -n $pane_id ]] || continue
+
+  pane_running="$(show_option p "$pane_id" "$pane_running_option")"
+  if [[ $pane_running == 1 ]]; then
+    any_running=1
+  fi
+
+  if [[ $pane_active == 1 ]]; then
+    active_pane_id="$pane_id"
+    active_pane_running="$pane_running"
+    active_pane_command="$(show_option p "$pane_id" "$pane_command_option")"
+  fi
+done < <(tmux list-panes -t "$window_id" -F '#{pane_id}	#{pane_active}' 2>/dev/null)
+
+desired_window_name=''
+if [[ $active_pane_running == 1 && -n $active_pane_command ]]; then
+  desired_window_name="$active_pane_command"
+elif [[ -n $original_window_name ]]; then
+  desired_window_name="$original_window_name"
+fi
+
+if [[ -n $desired_window_name && $desired_window_name != $current_window_name ]]; then
+  tmux rename-window -t "$window_id" "$desired_window_name" >/dev/null 2>&1
+fi
+
+if (( ! any_running )) && [[ -n $original_window_name ]]; then
+  tmux set-option -wuq -t "$window_id" "$window_original_option" >/dev/null 2>&1
+fi
