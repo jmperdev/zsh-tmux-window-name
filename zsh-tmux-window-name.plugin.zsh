@@ -85,18 +85,22 @@ __zsh_tmux_window_name_refresh() {
 __zsh_tmux_window_name_install_tmux_hooks() {
   emulate -L zsh
 
-  local hook_shell
+  local selection_hook_shell
+  local event_hook_shell
   local quoted_script
-  local quoted_window
+  local quoted_current_window
+  local quoted_hook_window
 
   quoted_script="$(__zsh_tmux_window_name_shell_quote "$__zsh_tmux_window_name_refresh_script")"
-  quoted_window="$(__zsh_tmux_window_name_shell_quote '#{hook_window}')"
-  hook_shell="${quoted_script} ${quoted_window}"
+  quoted_current_window="$(__zsh_tmux_window_name_shell_quote '#{window_id}')"
+  quoted_hook_window="$(__zsh_tmux_window_name_shell_quote '#{hook_window}')"
+  selection_hook_shell="${quoted_script} ${quoted_current_window}"
+  event_hook_shell="${quoted_script} ${quoted_hook_window}"
 
-  tmux set-hook -g "after-select-pane[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
-  tmux set-hook -g "after-select-window[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
-  tmux set-hook -g "pane-exited[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
-  tmux set-hook -g "after-kill-pane[9000]" "run-shell \"${hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-select-pane[9000]" "run-shell \"${selection_hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-select-window[9000]" "run-shell \"${selection_hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "pane-exited[9000]" "run-shell \"${event_hook_shell}\"" >/dev/null 2>&1
+  tmux set-hook -g "after-kill-pane[9000]" "run-shell \"${event_hook_shell}\"" >/dev/null 2>&1
 }
 
 __zsh_tmux_window_name_is_ignored_command() {
