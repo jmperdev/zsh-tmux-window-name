@@ -179,7 +179,7 @@ __zsh_tmux_window_name_preexec() {
   __zsh_tmux_window_name_should_run || return 0
 
   local line="$1"
-  local next_name state window_id current_name original_name
+  local next_name state window_id current_name original_name active_pane_running active_pane_command
   local separator="$__zsh_tmux_window_name_field_separator"
   local -a tmux_args
 
@@ -187,19 +187,33 @@ __zsh_tmux_window_name_preexec() {
   [[ -n $next_name ]] || return 0
   __zsh_tmux_window_name_is_ignored_command "$next_name" && return 0
 
-  state="$(__zsh_tmux_window_name_window_state "$TMUX_PANE")" || return 0
+  state="$(__zsh_tmux_window_name_state "$TMUX_PANE")" || return 0
   [[ -n $state ]] || return 0
-  IFS="$separator" read -r window_id current_name original_name <<< "$state"
+  IFS="$separator" read -r window_id current_name original_name _ _ active_pane_running active_pane_command <<< "$state"
   [[ -n $window_id ]] || return 0
 
   if [[ -z $original_name && -n $current_name ]]; then
-    tmux_args+=(set-option -wq -t "$window_id" "$__zsh_tmux_window_name_window_original_option" "$current_name" \;)
+    tmux_args+=(set-option -wq -t "$window_id" "$__zsh_tmux_window_name_window_original_option" "$current_name")
   fi
 
-  tmux_args+=(set-option -pq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_command_option" "$next_name" \;)
-  tmux_args+=(set-option -pq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_running_option" 1)
+  if [[ $current_name != $next_name ]]; then
+    (( ${#tmux_args} )) && tmux_args+=(\;)
+    tmux_args+=(rename-window -t "$window_id" "$next_name")
+  fi
+
+  if [[ $active_pane_command != $next_name ]]; then
+    (( ${#tmux_args} )) && tmux_args+=(\;)
+    tmux_args+=(set-option -pq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_command_option" "$next_name")
+  fi
+
+  if [[ $active_pane_running != 1 ]]; then
+    (( ${#tmux_args} )) && tmux_args+=(\;)
+    tmux_args+=(set-option -pq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_running_option" 1)
+  fi
+
+  (( ${#tmux_args} )) || return 0
+
   tmux "${tmux_args[@]}" >/dev/null 2>&1
-  __zsh_tmux_window_name_refresh "$window_id"
 }
 
 __zsh_tmux_window_name_precmd() {
@@ -207,18 +221,45 @@ __zsh_tmux_window_name_precmd() {
 
   __zsh_tmux_window_name_should_run || return 0
 
-  local window_id
   local state
+  local window_id
+  local current_name
+  local original_name
+  local inactive_running_flags
+  local active_pane_running
+  local active_pane_command
   local separator="$__zsh_tmux_window_name_field_separator"
+  local -a tmux_args
 
-  state="$(__zsh_tmux_window_name_window_state "$TMUX_PANE")" || return 0
+  state="$(__zsh_tmux_window_name_state "$TMUX_PANE")" || return 0
   [[ -n $state ]] || return 0
-  IFS="$separator" read -r window_id _ <<< "$state"
+  IFS="$separator" read -r window_id current_name original_name _ inactive_running_flags active_pane_running active_pane_command <<< "$state"
   [[ -n $window_id ]] || return 0
 
-  tmux set-option -puq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_command_option" \; \
-    set-option -puq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_running_option" >/dev/null 2>&1
-  __zsh_tmux_window_name_refresh "$window_id"
+  if [[ -n $active_pane_command ]]; then
+    tmux_args+=(set-option -puq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_command_option")
+  fi
+
+  if [[ -n $active_pane_running ]]; then
+    (( ${#tmux_args} )) && tmux_args+=(\;)
+    tmux_args+=(set-option -puq -t "$TMUX_PANE" "$__zsh_tmux_window_name_pane_running_option")
+  fi
+
+  if [[ -n $original_name ]]; then
+    if [[ $current_name != $original_name ]]; then
+      (( ${#tmux_args} )) && tmux_args+=(\;)
+      tmux_args+=(rename-window -t "$window_id" "$original_name")
+    fi
+
+    if [[ $inactive_running_flags != *1* ]]; then
+      (( ${#tmux_args} )) && tmux_args+=(\;)
+      tmux_args+=(set-option -wuq -t "$window_id" "$__zsh_tmux_window_name_window_original_option")
+    fi
+  fi
+
+  (( ${#tmux_args} )) || return 0
+
+  tmux "${tmux_args[@]}" >/dev/null 2>&1
 }
 
 if __zsh_tmux_window_name_should_run; then
